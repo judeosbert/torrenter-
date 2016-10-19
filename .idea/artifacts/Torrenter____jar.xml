@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Torrenter ++:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Torrenter____jar</output-path>
+    <root id="archive" name="Torrenter ++.jar">
+      <element id="module-output" name="Torrenter ++" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/src/apache-commons-codec-1.4.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
