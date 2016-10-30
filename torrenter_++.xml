@@ -35,14 +35,14 @@
     <exclude name="**/vssver2.scc/**"/>
   </patternset>
   <patternset id="library.patterns">
-    <include name="*.war"/>
-    <include name="*.swc"/>
-    <include name="*.apk"/>
-    <include name="*.zip"/>
     <include name="*.egg"/>
-    <include name="*.ane"/>
     <include name="*.jar"/>
     <include name="*.ear"/>
+    <include name="*.ane"/>
+    <include name="*.apk"/>
+    <include name="*.swc"/>
+    <include name="*.war"/>
+    <include name="*.zip"/>
   </patternset>
   <patternset id="compiler.resources">
     <exclude name="**/?*.java"/>
@@ -125,23 +125,31 @@
   <path id="torrenter_++.module.production.classpath">
     <path refid="${module.jdk.classpath.torrenter_++}"/>
     <pathelement location="${basedir}/src/apache-commons-codec-1.4.jar"/>
+    <pathelement location="${basedir}/src/org.json.jar"/>
+    <pathelement location="${basedir}/src/sqlite-jdbc-3.8.11.2.jar"/>
   </path>
   
   <path id="torrenter_++.runtime.production.module.classpath">
     <pathelement location="${torrenter_++.output.dir}"/>
     <pathelement location="${basedir}/src/apache-commons-codec-1.4.jar"/>
+    <pathelement location="${basedir}/src/org.json.jar"/>
+    <pathelement location="${basedir}/src/sqlite-jdbc-3.8.11.2.jar"/>
   </path>
   
   <path id="torrenter_++.module.classpath">
     <path refid="${module.jdk.classpath.torrenter_++}"/>
     <pathelement location="${torrenter_++.output.dir}"/>
     <pathelement location="${basedir}/src/apache-commons-codec-1.4.jar"/>
+    <pathelement location="${basedir}/src/org.json.jar"/>
+    <pathelement location="${basedir}/src/sqlite-jdbc-3.8.11.2.jar"/>
   </path>
   
   <path id="torrenter_++.runtime.module.classpath">
     <pathelement location="${torrenter_++.testoutput.dir}"/>
     <pathelement location="${torrenter_++.output.dir}"/>
     <pathelement location="${basedir}/src/apache-commons-codec-1.4.jar"/>
+    <pathelement location="${basedir}/src/org.json.jar"/>
+    <pathelement location="${basedir}/src/sqlite-jdbc-3.8.11.2.jar"/>
   </path>
   
   
@@ -195,5 +203,32 @@
   
   <target name="build.modules" depends="init, clean, compile.module.torrenter_++" description="build all modules"/>
   
-  <target name="all" depends="build.modules" description="build all"/>
+  <target name="init.artifacts">
+    <property name="artifacts.temp.dir" value="${basedir}/__artifacts_temp"/>
+    <property name="artifact.output.torrenter_++:jar" value="${basedir}/out/artifacts/Torrenter____jar"/>
+    <mkdir dir="${artifacts.temp.dir}"/>
+    <property name="temp.jar.path.Torrenter ++.jar" value="${artifacts.temp.dir}/Torrenter ++.jar"/>
+  </target>
+  
+  <target name="artifact.torrenter_++:jar" depends="init.artifacts, compile.module.torrenter_++" description="Build &#39;Torrenter ++:jar&#39; artifact">
+    <property name="artifact.temp.output.torrenter_++:jar" value="${artifacts.temp.dir}/Torrenter____jar"/>
+    <mkdir dir="${artifact.temp.output.torrenter_++:jar}"/>
+    <jar destfile="${temp.jar.path.Torrenter ++.jar}" duplicate="preserve" filesetmanifest="mergewithoutmain">
+      <zipfileset dir="${torrenter_++.output.dir}"/>
+      <zipfileset src="${basedir}/src/apache-commons-codec-1.4.jar"/>
+    </jar>
+    <copy file="${temp.jar.path.Torrenter ++.jar}" tofile="${artifact.temp.output.torrenter_++:jar}/Torrenter ++.jar"/>
+  </target>
+  
+  <target name="build.all.artifacts" depends="artifact.torrenter_++:jar" description="Build all artifacts">
+    <mkdir dir="${artifact.output.torrenter_++:jar}"/>
+    <copy todir="${artifact.output.torrenter_++:jar}">
+      <fileset dir="${artifact.temp.output.torrenter_++:jar}"/>
+    </copy>
+    
+    <!-- Delete temporary files -->
+    <delete dir="${artifacts.temp.dir}"/>
+  </target>
+  
+  <target name="all" depends="build.modules, build.all.artifacts" description="build all"/>
 </project>

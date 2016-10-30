@@ -1,17 +1,17 @@
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.*;
-import java.sql.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.sql.Connection;
 import java.util.ArrayList;
 
-/**
- * Created by jude on 11/10/16.
- */
+
 public class startTorrenting {
     ArrayList<String> seederListArray = new ArrayList<String>();
     int torrentID,torrentSize,torrentPartNo;
@@ -19,6 +19,11 @@ public class startTorrenting {
     String torrentName="";
     private Connection c=null;
     String userHome = System.getProperty("user.home");
+    Boolean shownCompletedStatus = false;
+    startTorrenting()
+    {
+
+    }
 
     startTorrenting(int torrentID,String torrentName)
     {
@@ -82,7 +87,8 @@ public class startTorrenting {
         //On failure from any one peer we just move on to the next list. 
         //Also update the peer list every 2 seconds looking for any new peers. This can be later given to assign priority
         getTorrentData();
-        udpClient udpclient = new udpClient(seederListArray,torrentID,torrentName,torrentSize,torrentPartNo);
+
+        tcpClient udpclient = new tcpClient(seederListArray,torrentID,torrentName,torrentSize,torrentPartNo);
 
     }
 
@@ -120,6 +126,14 @@ public class startTorrenting {
 
         }
 
+    }
+    void showCompletedMessage()
+    {
+        if (!shownCompletedStatus) {
+            shownCompletedStatus= true;
+            String message = "The file "+torrentName+" has been completely downloaded";
+            JOptionPane.showMessageDialog(null, message);
+        }
     }
 
 }

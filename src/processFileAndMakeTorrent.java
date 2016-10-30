@@ -7,9 +7,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/**
- * Created by jude on 11/9/16.
- */
+
 public class processFileAndMakeTorrent extends JFrame {
 
     private JPanel panel1;
@@ -116,9 +114,9 @@ public class processFileAndMakeTorrent extends JFrame {
         in.close();
         System.out.println("Torrent Number "+response.toString());
         textField1.setText(response.toString());
-        MainWIndow mainWindow = new MainWIndow(1);
-        mainWindow.initiateDBConnection();
-        mainWindow.addMyTorrent(response.toString(),filePath);
+        MainWIndow mainWindow1 = new MainWIndow(1);
+        mainWindow1.initiateDBConnection();
+        mainWindow1.addMyTorrent(response.toString(),filePath);
 
 
         return 0;
@@ -130,12 +128,14 @@ public class processFileAndMakeTorrent extends JFrame {
         String hashCode="";
         try {
             System.out.println("Reading file and computing Hash");
-            FileInputStream fileIn = new FileInputStream(s);
+            RandomAccessFile fileIn = new RandomAccessFile(s,"rw");
+            fileIn.seek(0);
             byte[] buffer = new byte[finalFixedPieceSize];
             int start=0;
             while(start<fileSize) {
                 fileIn.read(buffer, 0, finalFixedPieceSize);
                 //System.out.println(buffer);
+
                 hashCode += DigestUtils.shaHex(buffer);
                 start=start+finalFixedPieceSize;
             }

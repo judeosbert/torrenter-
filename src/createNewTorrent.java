@@ -4,9 +4,7 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 
 
-/**
- * Created by jude on 10/9/16.
- */
+
 public class createNewTorrent extends JFrame {
     private JLabel selectFileNote;
     private JPanel panel1;

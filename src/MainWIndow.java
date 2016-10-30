@@ -46,7 +46,7 @@ public class MainWIndow extends JFrame {
                 @Override
                 public void run() {
                     try {
-                        udpServer udpserver = new udpServer();
+                        tcpServer udpserver = new tcpServer();
                     } catch (SocketException e) {
                         e.printStackTrace();
                     }
@@ -85,7 +85,7 @@ public class MainWIndow extends JFrame {
         {
             c = DriverManager.getConnection("jdbc:sqlite:"+userHome+"/Torrenter++/torrents.db");
            // c.setAutoCommit(true);
-            System.out.println("Database connection established");
+            //System.out.println("Database connection established");
             createDBTables();
         }  catch (SQLException e) {
             e.printStackTrace();
@@ -111,7 +111,7 @@ public class MainWIndow extends JFrame {
             stmt.execute(query);
             query = "create table if  not exists hashes(hashID INTEGER  PRIMARY KEY AUTOINCREMENT,torrentID int(6),partID int(255) ,hashValue varchar(255))";
             stmt.execute(query);
-            System.out.println("Database created if not exists");
+            //System.out.println("Database created if not exists");
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -180,13 +180,12 @@ public class MainWIndow extends JFrame {
                 String torrentStatus = resultSet.getString("torrentStatus");
                 System.out.println(torrentName);
                 addToTorrentTable(String.valueOf(torrentID), torrentName,torrentSize,torrentStatus);
-                /*
-                The line following has been removed because the same system is trying to run the same class twice. Instead of this line the line in addToTorrentTable
-                is retained bcoz that is common for new as well as for the ones taken from the database
-                 */
+
                 //startTorrenting startTorrenting = new startTorrenting(torrentID,torrentName);
             }
             resultSet.close();
+            preparedStatement.close();
+            System.out.print("Statement Closed Get Active Torrent");
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -237,6 +236,7 @@ public class MainWIndow extends JFrame {
             preparedStatement.executeUpdate();
             System.out.println("Torrent Added to Active Torrents DB");
             preparedStatement.close();
+            System.out.print("Statement Closed Added to Active Torrents");
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -281,31 +281,12 @@ public class MainWIndow extends JFrame {
                 preparedStatement.setString(6,userHome+"/Torrenter++/"+torrentName);
                 preparedStatement.executeUpdate();
                 preparedStatement.close();
+                System.out.print("Statement Closed Metadata Function");
 
                 splitByNumber(torrentHash,Integer.parseInt(torrentID),Integer.parseInt(torrentPieceCount));
                 int count = 0;
                 //Stupid thing. This has been changed to the splitByNumber Function.
-//                query = "insert into hashes (torrentID,partID,hashValue) VALUES (?,?,?)";
-//                preparedStatement = c.prepareStatement(query);
-//                for (String hashPart : hashParts) {
-//
-//                    preparedStatement.setInt(1,Integer.parseInt(torrentID));
-//                    preparedStatement.setInt(2,count++);
-//                    preparedStatement.setString(3,hashPart);
-//                    preparedStatement.executeUpdate();
-//
-//
-//r
-//                }
-//                preparedStatement.close();
-                //Create a dummyfile to which the data will be later appended.
 
-//                File file = new File(userHome+"/Torrenter++/"+torrentName);
-//                try {
-//                    file.createNewFile();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
                 try {
                     RandomAccessFile file = new RandomAccessFile(userHome+"/Torrenter++/"+torrentName,"rw");
                     file.setLength(Integer.parseInt(torrentSize));
@@ -316,6 +297,7 @@ public class MainWIndow extends JFrame {
                     e.printStackTrace();
                 }
                 dialog.setVisible(false);
+
                 showDialog.stop();
                 addToTorrentTable(torrentID,torrentName,Integer.parseInt(torrentSize),"Downloading");
 
@@ -329,6 +311,13 @@ public class MainWIndow extends JFrame {
             showDialog.stop();
             //e.printStackTrace();
 
+            }
+            finally {
+                try {
+                    showDialog.join(10);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
 
 
@@ -348,11 +337,12 @@ public class MainWIndow extends JFrame {
         row.add(progress);
         table.addRow(row);
         System.out.println("Torrent Added to Active Torrents Table");
-        Thread callClient = new Thread(() -> {
-            startTorrenting startTorrenting1 = new startTorrenting(Integer.parseInt(torrentID),torrentName);
-        });
-        callClient.start(); //The function is a bit problamatic
-
+        if(!progress.equals("Completed")) {
+            Thread callClient = new Thread(() -> {
+                startTorrenting startTorrenting1 = new startTorrenting(Integer.parseInt(torrentID), torrentName);
+            });
+            callClient.start(); //The function is a bit problamatic -- Problem Solved :D
+        }
 
 
 
@@ -404,15 +394,20 @@ public class MainWIndow extends JFrame {
             preparedStatement.setInt(2, count++);
             preparedStatement.setString(3, hashText);
             preparedStatement.executeUpdate();
-            processingBar.setValue(count);
+            //processingBar.setValue(count);
 
 
         }
 
             preparedStatement.close();
+            System.out.print("Statement Closed Split By Number");
         }
         catch (SQLException e) {
             e.printStackTrace();
+
+        }
+        finally {
+
         }
 
     }
@@ -428,6 +423,7 @@ public class MainWIndow extends JFrame {
             int torrentSize = resultSet.getInt("torrentSize");
             int torrentPartNo = resultSet.getInt("torrentPartNo");
             preparedStatement.close();
+            System.out.print("Statement Closed Get Torrent Data");
             torrentData.add(torrentSize);
             torrentData.add(torrentPartNo);
         } catch (SQLException e) {
@@ -502,6 +498,8 @@ public class MainWIndow extends JFrame {
             {
                 downloadedParts.add(resultSet.getInt("partID"));
             }
+            preparedStatement.close();
+            System.out.print("Statement Closed Dwonloaded Parts");
             return downloadedParts;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -509,5 +507,93 @@ public class MainWIndow extends JFrame {
 
 
         return null;
+    }
+
+
+    public String checkIfOwner(int torrentNumber) {
+        try {
+            PreparedStatement prepareStatement = c.prepareStatement("SELECT count(*) as ismine FROM myTorrents WHERE torrentID = ?");
+            prepareStatement.setInt(1,torrentNumber);
+            ResultSet resultSet = prepareStatement.executeQuery();
+            int result=0;
+            String filePath="";
+            while(resultSet.next())
+            {
+                result = resultSet.getInt("ismine");
+
+            }
+            prepareStatement.close();
+            if (result == 1)
+            {
+
+                prepareStatement = c.prepareStatement("SELECT filepath FROM myTorrents WHERE torrentID = ?");
+                prepareStatement.setInt(1,torrentNumber);
+                resultSet = prepareStatement.executeQuery();
+                while(resultSet.next())
+                {
+                    filePath = resultSet.getString("filepath");
+                }
+                prepareStatement.close();
+                System.out.print("Statement Closed Check Owner");
+                return filePath;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return "fail";
+
+    }
+    public String getParthash(int torrentID, int partNo) {
+        String returnValue="";
+        try {
+            PreparedStatement preparedStatement = c .prepareStatement("SELECT hashValue FROM hashes WHERE torrentID = ? AND partID = ? ");
+            preparedStatement.setInt(1,torrentID);
+            preparedStatement.setInt(2,partNo-1);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while(resultSet.next())
+            {
+                returnValue =  resultSet.getString("hashValue");
+            }
+
+            preparedStatement.close();
+            System.out.print("Statement Closed Get Part Hash");
+            return  returnValue;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public String getLocalPath(int torrentID) {
+
+        return "";
+    }
+
+    public void addToCompleted(int torrentID, int partNo) {
+
+        try {
+            PreparedStatement preparedStatement = c.prepareStatement("INSERT INTO completedParts(torrentID, partID) VALUES (?,?) ");
+            preparedStatement.setInt(1,torrentID);
+            preparedStatement.setInt(2,partNo);
+            preparedStatement.executeUpdate();
+            preparedStatement.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void updateCompleteStatus(int torrentID) {
+        try {
+            PreparedStatement prepareStatment = c. prepareStatement("UPDATE activeTorrents SET torrentStatus = 'Completed' WHERE torrentID = ?");
+            prepareStatment.setInt(1,torrentID);
+            prepareStatment.executeUpdate();
+            prepareStatment.close();
+            System.out.print("Statement Closed Update Complete Status");
+
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
