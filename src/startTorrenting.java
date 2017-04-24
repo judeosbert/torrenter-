@@ -19,9 +19,13 @@ public class startTorrenting {
     String torrentName="";
     private Connection c=null;
     String userHome = System.getProperty("user.home");
-    Boolean shownCompletedStatus = false;
+//    String tracker = "192.168.43.113";
+String tracker = "localhost";
+    MainWIndow mainWindow = new MainWIndow(2);
+
     startTorrenting()
     {
+
 
     }
 
@@ -30,24 +34,52 @@ public class startTorrenting {
         this.torrentName = torrentName;
         this.torrentID = torrentID;
         System.out.print("Starting torrent for "+torrentID);
-
+        mainWindow.initiateDBConnection();
         //Starting server and client in UDP for downloading and uploading
+        torrentPartNo = mainWindow.getTotalPieceCount(torrentID);
 
 
 
 
-        try {
-            getSwarmList(torrentID);
-        } catch (IOException e) {
-            e.printStackTrace();
+            while(notAllPartsDownloaded(torrentID)) {
+                try {
+                    getSwarmList(torrentID);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+        System.out.print("File is COmpletely Downloaded");
+        int row = universalData.getRowNo(String.valueOf(torrentID));
+        int column = 3;
+        //table1.setValueAt("Completed",row,column);
+        mainWindow.updateCompleteStatus(torrentID);
+        showCompletedMessage();
+
+    }
+    private boolean notAllPartsDownloaded(int torrentID) {
+
+        ArrayList<Integer> downloadedParts;
+        int downloadedPartCount;
+        System.out.print("Torrent ID:" +torrentID);
+        downloadedParts = mainWindow.getDownloadedPartCount(torrentID);
+        downloadedPartCount = downloadedParts.size();
+        System.out.println("Downloaded Part Size"+downloadedPartCount);
+        System.out.println("Complete Torrent Size"+torrentPartNo);
+        System.out.print("Whats system says" +(downloadedPartCount==torrentPartNo));
+        if(downloadedPartCount != torrentPartNo)
+        {
+            return true;
         }
+            System.out.print("Returning False");
+            return false;
     }
 
 
     private void getSwarmList(int torrentID) throws IOException {
 
 
-        String urlS = "http://localhost/projects/torrent/getSwarmList/index.php";
+        String urlS = "http://"+tracker+"/projects/torrent/getSwarmList/index.php";
         String parameters="torrentID="+torrentID;
         URL url = new URL(urlS);
 
@@ -88,7 +120,9 @@ public class startTorrenting {
         //Also update the peer list every 2 seconds looking for any new peers. This can be later given to assign priority
         getTorrentData();
 
-        tcpClient udpclient = new tcpClient(seederListArray,torrentID,torrentName,torrentSize,torrentPartNo);
+        for (String peerIP:seederListArray) {
+            tcpClient tcpClient = new tcpClient(peerIP, torrentID, torrentName, torrentSize, torrentPartNo);
+        }
 
     }
 
@@ -110,6 +144,7 @@ public class startTorrenting {
     }
 
 
+
     private void processOutput(String response) throws JSONException {
         JSONObject jsonObject = new JSONObject(response);
         int seederCount = jsonObject.getInt("seederCount");
@@ -129,12 +164,11 @@ public class startTorrenting {
     }
     void showCompletedMessage()
     {
-        if (!shownCompletedStatus) {
-            shownCompletedStatus= true;
+
             String message = "The file "+torrentName+" has been completely downloaded";
             JOptionPane.showMessageDialog(null, message);
         }
-    }
+
 
 }
 

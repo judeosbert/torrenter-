@@ -77,7 +77,18 @@ public class clientHandler implements Runnable {
         if(filepath.equals("fail"))
         {
             System.out.print("I AM not the owner");
-            //Go looking in the meta data and completedParts
+            //Check in completed parts with torrent number for requested part no. if yes pass the request to getFilePart
+            String savePath = mainWIndow.checkifPartCompleted(partNumber,torrentNumber);
+            if(savePath.length()!=0)
+                getFilePart(torrentNumber,savePath);
+            else
+            {
+                try {
+                    respondFileNotFound();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
         else
         {
@@ -85,16 +96,24 @@ public class clientHandler implements Runnable {
         }
     }
 
+    private void respondFileNotFound() throws IOException {
+        String response = "fail";
+        toClient.write(response.getBytes());
+    }
+
     private void getFilePart(int partNumber, String filepath) {
             System.out.print("Looking for part Number "+partNumber+"For file in "+filepath);
         try {
             RandomAccessFile file = new RandomAccessFile(filepath,"rw");
             System.out.print("Opening File");
-            int offset = (partNumber-1)*fixedPieceSize;
+            int offset = ((partNumber-1)*fixedPieceSize);
             file.seek(offset);
+
             byte[] buffer = new byte[fixedPieceSize];
             System.out.print("Buffer Data Size"+buffer.length);
             int n = file.read(buffer,0,fixedPieceSize);
+
+
             System.out.print("\nBytes Read from File "+n);
             file.close();
             System.out.print("File has been read.");
@@ -102,8 +121,8 @@ public class clientHandler implements Runnable {
             String sha="";
             sha+=DigestUtils.shaHex(buffer);
             System.out.print("\n Sha "+ sha);
-            //toClient.flush();
-            toClient.write(buffer,0,buffer.length);
+            toClient.flush();
+            toClient.write(buffer,0,n);
 
             toClient.flush();
             toClient.close();

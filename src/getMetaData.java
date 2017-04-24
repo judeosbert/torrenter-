@@ -12,6 +12,8 @@ import java.net.URL;
 public class getMetaData extends JFrame {
     private JPanel panel1;
     private JLabel torrentNumberLabel;
+//    String tracker = "192.168.43.113";
+    String tracker = "localhost";
 
 
     public getMetaData()
@@ -30,7 +32,7 @@ public class getMetaData extends JFrame {
     {
         torrentNumberLabel.setText(torrentNumber);
         System.out.println("Torrent Number Obtained as "+torrentNumber);
-        String urlS = "http://localhost/projects/torrent/getDetails/index.php";
+        String urlS = "http://"+tracker+"/projects/torrent/getDetails/index.php";
         String parameters="torrentId="+torrentNumber;
         URL url = new URL(urlS);
 

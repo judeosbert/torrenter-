@@ -12,7 +12,10 @@ import java.util.Random;
 
 public class tcpClient implements Runnable {
     int fixedPieceSize = 1048576;
-    String serverAddress="localhost";//Replace by ip address of permanent server
+//    String serverAddress="192.168.43.113";
+    String peerIP;
+    String tracker = "localhost";
+
 
 
     byte[] sendData = new byte[fixedPieceSize];
@@ -27,9 +30,9 @@ public class tcpClient implements Runnable {
     int torrentID,torrentSize,torrentPartNo,downloadedPartCount;
     String torrentName;
     public MainWIndow mainWindow;
-    tcpClient(ArrayList<String> seederListArray, int torrentID, String torrentName, int torrentSize, int torrentPartNo)
+    tcpClient(String peerIP, int torrentID, String torrentName, int torrentSize, int torrentPartNo)
         {
-            this.seederListArray = seederListArray;
+            this.peerIP = peerIP;
             this.torrentID = torrentID;
             this.torrentName = torrentName;
             this.torrentSize = torrentSize;
@@ -53,7 +56,7 @@ public class tcpClient implements Runnable {
 
             String response="";
             socketClient = new Socket();
-            socketClient.connect(new InetSocketAddress(serverAddress,5001),20000);
+            socketClient.connect(new InetSocketAddress(peerIP,5002),20000);
             toServer = new DataOutputStream(socketClient.getOutputStream());
             fromServer = new DataInputStream(socketClient.getInputStream());
 
@@ -71,14 +74,17 @@ public class tcpClient implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
     }
 
     private void startGettingfileParts() throws IOException {
         //System.out.println("Start Getting file parts");
         int partNo;
-
-        while(notAllPartsDownloaded())
+        boolean partsDownloaded = getPartsDownloaded();
+        if(!partsDownloaded)
         {
+            return;
+        }
 
         partNo = generatePartNo();
             if(partNo < 0)
@@ -116,8 +122,11 @@ public class tcpClient implements Runnable {
                     outputStream.write(buffer);
                     totalBytesRead+=n;
 
+
                 }
+                System.out.print("CLIENT: Bytes Read from server"+totalBytesRead);
                 System.out.print("Reading While Completed");
+                //recieveData = new byte[totalBytesRead];
                 recieveData = outputStream.toByteArray();
 
                 System.out.print("\nReceived Data "+recieveData);
@@ -147,8 +156,8 @@ public class tcpClient implements Runnable {
                         }
                         else
                         {
-                            int seekPos = ((partNo-1)*fixedPieceSize)+1;
-                            raf.seek(seekPos);
+                            int seekPos = ((partNo-1)*fixedPieceSize);//+1
+                            raf.seek(seekPos); //seekPos
                         }
                         raf.write(recieveData,0,totalBytesRead);
                         raf.close();
@@ -162,7 +171,7 @@ public class tcpClient implements Runnable {
                         System.out.print("\nBAD Hash Obtained");
                     }
                     socketClient.close();
-                    this.run();
+
                 }
 
 
@@ -172,27 +181,18 @@ public class tcpClient implements Runnable {
                 System.out.print("Socket Write Error");
 
 
-                try {
-                    Thread.sleep(5000);
 
-                } catch (InterruptedException e1) {
-                    e1.printStackTrace();
-                }
             }
 
-        }
-        System.out.print("File is COmpletely Downloaded");
-        mainWindow.updateCompleteStatus(torrentID);
 
-        if(!shownCompletedStatus)
-        {
-            starttorrenting.showCompletedMessage();
-            shownCompletedStatus = true;
-        }
+
+
+
 
 
 
     }
+
 
 
 
@@ -204,7 +204,7 @@ public class tcpClient implements Runnable {
         do
         {
              n = rand.nextInt(torrentPartNo)+1;
-            System.out.print("\n"+n);
+
             found = downloadedParts.contains(n);
             if(!found && n > 0)
                 return n;
@@ -215,20 +215,21 @@ public class tcpClient implements Runnable {
 
     }
 
-    private boolean notAllPartsDownloaded() {
+    private boolean getPartsDownloaded() {
 
 
         downloadedParts = mainWindow.getDownloadedPartCount(torrentID);
         downloadedPartCount = downloadedParts.size();
         System.out.println("Downloaded Part Size"+downloadedPartCount);
         System.out.println("Complete Torrent Size"+torrentPartNo);
+        System.out.print("TCP CLient says");
         if(downloadedPartCount != torrentPartNo)
         {
             return true;
         }
         else
         {
-            mainWindow.updateCompleteStatus(torrentID);
+            //mainWindow.updateCompleteStatus(torrentID);
             return false;
         }
     }

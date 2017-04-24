@@ -13,7 +13,7 @@ public class tcpServer implements Runnable
 
     public tcpServer() throws SocketException {
         try {
-            serverSocket = new ServerSocket(5001);
+            serverSocket = new ServerSocket(5002);
         } catch (IOException e) {
             e.printStackTrace();
         }

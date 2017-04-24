@@ -22,7 +22,7 @@ public class createNewTorrent extends JFrame {
 
     private void intiateUI() {
         setTitle("Create new Torrent");
-        Dimension d = new Dimension(1000,800);
+        Dimension d = new Dimension(1000,400);
         setMinimumSize(d);
         setLayout( new GridLayout(5,1));
         setLocationRelativeTo(null);
@@ -43,7 +43,7 @@ public class createNewTorrent extends JFrame {
                 fileInformationTextArea.setText("File Information");
                 fileInformationTextArea.append("\nName:"+file.getName());
                 fileInformationTextArea.append("\nPath:"+file.getAbsolutePath());
-                fileInformationTextArea.append("\nSize:"+file.length()+" bytes");
+                fileInformationTextArea.append("\nSize:"+bytesToMB(file.length())+" MB");
 
                 fileInformationTextArea.setEditable(false);
                 fileInfo[0]=file.getName();
@@ -92,7 +92,14 @@ public class createNewTorrent extends JFrame {
     }
 
 
+    private String bytesToMB(long torrentSize) {
 
+        double intSize = torrentSize;
+        intSize =  (intSize/Math.pow(1024,2));
+        intSize = Math.round(intSize*100D)/100D;
+
+        return String.valueOf(intSize);
+    }
 
     public static void main(String[] args)
     {

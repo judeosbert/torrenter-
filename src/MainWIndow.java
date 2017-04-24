@@ -20,12 +20,14 @@ public class MainWIndow extends JFrame {
     private JPanel jPanel;
     private JTextField torrentNumber;
     private JButton startTorrenting;
-    private JTable table1;
+    protected JTable table1;
     private ArrayList<String> seederListArray;
     private DefaultTableModel table;
     String userHome = System.getProperty("user.home");
-    public Connection c = null;
-    public JProgressBar processingBar;
+
+    private Connection c = null;
+    private JProgressBar processingBar;
+    public Thread updateTorrentTable;
 
 
     Statement stmt = null;
@@ -39,20 +41,26 @@ public class MainWIndow extends JFrame {
     {
 
         try {
+           // makeConfigFile();
             createDirectories();
             initiateDBConnection();
 
-            Thread serverThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        tcpServer udpserver = new tcpServer();
-                    } catch (SocketException e) {
-                        e.printStackTrace();
-                    }
+            Thread serverThread = new Thread(() -> {
+                try {
+                    tcpServer udpserver = new tcpServer();
+                } catch (SocketException e) {
+                    e.printStackTrace();
                 }
             });
             serverThread.start();
+
+            Thread onlineStatusUpdater = new Thread(() -> {
+
+                    onlinePoller onlinepoller = new onlinePoller();
+
+            });
+            onlineStatusUpdater.start();
+
             intiateUI();
 
 
@@ -60,6 +68,85 @@ public class MainWIndow extends JFrame {
             e.printStackTrace();
         }
 
+    }
+    private void makeConfigFile()
+    {
+
+            try {
+                RandomAccessFile trackerIp = new RandomAccessFile(userHome + "/Torrenter++/.config", "rw");
+                String ip = "127.0.0.1";
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("IP",ip);
+                trackerIp.writeChars(jsonObject.toString());
+                trackerIp.close();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (JSONException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+
+
+
+    }
+    private void getTrackerData() {
+        RandomAccessFile trackerIP = null;
+        try {
+            trackerIP = new RandomAccessFile(userHome + "/Torrenter++/.config", "rw");
+            String ip = "";
+            ip = trackerIP.readLine();
+            JSONObject jsonObject = new JSONObject(trackerIP);
+
+
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void tableUpdate() {
+
+        while(true)
+        {
+
+            table.setRowCount(0);
+            String query = "SELECT metadata.torrentID,torrentName,torrentSize,torrentPartNo,progress FROM (SELECT count(*) as progress,torrentID as torrentNo FROM completedParts GROUP BY torrentID),metadata WHERE metadata.torrentID = torrentNo";
+
+            try {
+                PreparedStatement preparedStatement  = c.prepareStatement(query);
+                ResultSet resultSet = preparedStatement.executeQuery();
+                while(resultSet.next())
+                {
+                    //S,S,I,S
+                    String torrentID = resultSet.getString("torrentID");
+                    String torrentName = resultSet.getString("torrentName");
+                    int torrentSize = resultSet.getInt("torrentSize");
+                    int totalParts = resultSet.getInt("torrentPartNo");
+                    int completedParts = resultSet.getInt("progress");
+                    int percent = (completedParts/totalParts)*100;
+
+                    updateTorrentTable(torrentID,torrentName,torrentSize,String.valueOf(percent));
+
+                }
+                preparedStatement.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
     }
 
     private void createDirectories() {
@@ -75,6 +162,7 @@ public class MainWIndow extends JFrame {
             {
                 JOptionPane.showMessageDialog(null,"Direcrtory Creation failed. Please check permissions");
             }
+
         }
 
     }
@@ -101,7 +189,7 @@ public class MainWIndow extends JFrame {
         try {
             stmt = c.createStatement();
             String query ="";
-            query = "create table if not exists myTorrents(torrentID int(6) primary key,filepath varchar(255))";
+            query = "create table if not exists myTorrents(torrentID int(6) primary key,name varchar(255),size int(6), filepath varchar(255))";
             stmt.execute(query);
             query = "create table if not exists completedParts(completedId integer primary key autoincrement,torrentID int(6),partID int(6))";
             stmt.execute(query);
@@ -121,14 +209,17 @@ public class MainWIndow extends JFrame {
 
     private void intiateUI() throws JSONException {
         createMenuBar();
+        add(jPanel);
         processingBar = new JProgressBar(0,100);
         processingBar.setStringPainted(true);
-        add(jPanel);
+
         table = (DefaultTableModel) table1.getModel();
+        table.addColumn("ID");
         table.addColumn("Name");
         table.addColumn("Size");
         table.addColumn("Progress");
         table1 = new JTable(table);
+//        updateTorrentTable.start();
         getActiveTorrents();
         torrentNumber.setToolTipText("Enter the torrent number");
         setTitle("Torrenter ++ v1.0 ");
@@ -252,16 +343,14 @@ public class MainWIndow extends JFrame {
         dialog.setTitle("Please wait while we process the metadata");
         dialog.setModal(true);
         dialog.setSize(1000,400);
-        dialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+        //dialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
         JPanel jPanel = new JPanel();
         jPanel.setSize(600,200);
-        processingBar.setSize(400,100);
-        jPanel.add(processingBar);
-        processingBar.setVisible(true);
-        JLabel jLabel = new JLabel("Please wait while we add the torrent");
+       JLabel jLabel = new JLabel("Please wait while we add the torrent");
         jPanel.add(jLabel);
         //final JOptionPane optionPane = new JOptionPane("Hello world",JOptionPane.INFORMATION_MESSAGE, JOptionPane.DEFAULT_OPTION, null, new Object[]{}, null);
         jPanel.setVisible(true);
+        ImageIcon imageIcon = new ImageIcon("load.gif");
 
         dialog.setLocationRelativeTo(null);
         dialog.setContentPane(jPanel);
@@ -289,7 +378,7 @@ public class MainWIndow extends JFrame {
 
                 try {
                     RandomAccessFile file = new RandomAccessFile(userHome+"/Torrenter++/"+torrentName,"rw");
-                    file.setLength(Integer.parseInt(torrentSize));
+                    //file.setLength(Integer.parseInt(torrentSize));
 
                 } catch (FileNotFoundException e) {
                     e.printStackTrace();
@@ -307,17 +396,16 @@ public class MainWIndow extends JFrame {
         catch (SQLException e) {
             System.out.print("The file is already added."); ////////Show error and the image
             JOptionPane.showMessageDialog(null,"The file has already been added. Please clear the file and retry again.");
+            dialog.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             dialog.setVisible(false);
-            showDialog.stop();
+            dialog.dispose();
             //e.printStackTrace();
 
             }
             finally {
-                try {
-                    showDialog.join(10);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+
+                    showDialog.stop();
+
             }
 
 
@@ -332,6 +420,7 @@ public class MainWIndow extends JFrame {
         String size = bytesToMB(torrentSize);
 
         Vector row = new Vector();
+        row.add(torrentID);
         row.add(torrentName);
         row.add(size+" MB");
         row.add(progress);
@@ -343,6 +432,22 @@ public class MainWIndow extends JFrame {
             });
             callClient.start(); //The function is a bit problamatic -- Problem Solved :D
         }
+
+
+
+    }
+    private void updateTorrentTable(String torrentID, String torrentName, int torrentSize, String progress) {
+
+
+        String size = bytesToMB(torrentSize);
+
+        Vector row = new Vector();
+        row.add(torrentID);
+        row.add(torrentName);
+        row.add(size+" MB");
+        row.add(progress+"%");
+        table.addRow(row);
+        //System.out.println("Table Updated");
 
 
 
@@ -444,6 +549,13 @@ public class MainWIndow extends JFrame {
             createTorrent.setVisible(true);
 
         });
+        JMenuItem myTorrent = new JMenuItem("My Torrents");
+        myTorrent.setToolTipText("See torrents you have created");
+        myTorrent.addActionListener((ActionEvent event) -> {
+            myTorrents mytorrents = new myTorrents();
+            mytorrents.setVisible(true);
+
+        });
 
 
 
@@ -453,8 +565,19 @@ public class MainWIndow extends JFrame {
             System.exit(0);
         });
         file.add(makeNewTorrent);
+        file.add(myTorrent);
         file.add(exitButton);
+        JMenu aBout = new JMenu("About");
+        JMenuItem aboutButton = new JMenuItem("Torrenter ++");
+
+        aboutButton.addActionListener((ActionEvent event) ->
+        {
+            about About = new about();
+            About.setVisible(true);
+        });
+        aBout.add(aboutButton);
         menuBar.add(file);
+        menuBar.add(aBout);
         setJMenuBar(menuBar);
 
     }
@@ -472,12 +595,14 @@ public class MainWIndow extends JFrame {
     }
 
 
-    public void addMyTorrent(String s, String filePath) {
-        String query = "INSERT INTO myTorrents(torrentID,filepath) VALUES (?,?)";
+    public void addMyTorrent(String s, String name, int fileSize, String path) {
+        String query = "INSERT INTO myTorrents(torrentID,name,size,filepath) VALUES (?,?,?,?)";
         try {
             PreparedStatement preparedStatement = c.prepareStatement(query);
             preparedStatement.setInt(1,Integer.parseInt(s));
-            preparedStatement.setString(2,filePath);
+            preparedStatement.setString(2,name);
+            preparedStatement.setInt(3,fileSize);
+            preparedStatement.setString(4,path);
             preparedStatement.executeUpdate();
             preparedStatement.close();
             System.out.print("Added torrent to your ownership");
@@ -488,12 +613,13 @@ public class MainWIndow extends JFrame {
     }
 
     public ArrayList<Integer> getDownloadedPartCount(int torrentID) {
-        String query = "SELECT partID FROM completedParts WHERE torrentID = ?";
+
         try {
+            String query = "SELECT partID FROM completedParts WHERE torrentID = ?";
             PreparedStatement preparedStatement = c.prepareStatement(query);
             preparedStatement.setInt(1,torrentID);
             ResultSet resultSet = preparedStatement.executeQuery();
-            ArrayList<Integer> downloadedParts = new ArrayList<Integer>();
+            ArrayList<Integer> downloadedParts = new ArrayList<>();
             while(resultSet.next())
             {
                 downloadedParts.add(resultSet.getInt("partID"));
@@ -502,6 +628,7 @@ public class MainWIndow extends JFrame {
             System.out.print("Statement Closed Dwonloaded Parts");
             return downloadedParts;
         } catch (SQLException e) {
+
             e.printStackTrace();
         }
 
@@ -595,5 +722,124 @@ public class MainWIndow extends JFrame {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    public int getTotalPieceCount(int torrentID) {
+
+        String query = "SELECT torrentPartNo FROM metadata WHERE torrentID = ?";
+        try {
+            PreparedStatement preapreStatement = c.prepareStatement(query);
+            preapreStatement.setInt(1,torrentID);
+            ResultSet resultSet = preapreStatement.executeQuery();
+            int totalPieceCount = 0 ;
+            while(resultSet.next())
+            {
+                totalPieceCount = resultSet.getInt("torrentPartNo");
+            }
+            return totalPieceCount;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return torrentID;
+    }
+
+    public String checkifPartCompleted(int partNumber, int torrentNumber) {
+        String responsePath = "";
+        String query= " SELECT count(*) as countPart FROM completedParts WHERE torrentID = ? AND partID = ?";
+        boolean partCompleted = false;
+        try {
+            PreparedStatement preparedStatement = c.prepareStatement(query);
+            preparedStatement.setInt(1,torrentNumber);
+            preparedStatement.setInt(2,partNumber);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while(resultSet.next())
+            {
+                int count = resultSet.getInt("countPart");
+                if(count > 0)
+                    partCompleted = true;
+                else
+                    partCompleted= false;
+            }
+            preparedStatement.close();
+            System.out.print("Statement Closed Check if Part COmpleted");
+
+            if (partCompleted)
+            {
+                responsePath = getFilePath(torrentNumber);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return responsePath;
+    }
+
+    private String getFilePath(int torrentNumber) {
+
+        String query = "SELECT torrentSavePath FROM metadata WHERE torrentID = ?";
+        String savePath = null;
+        try {
+            PreparedStatement preparedStatement = c.prepareStatement(query);
+            preparedStatement.setInt(1,torrentNumber);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while(resultSet.next())
+            {
+                savePath = resultSet.getString("torrentSavepath");
+            }
+            preparedStatement.close();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+
+        return savePath;
+    }
+
+    public String getMyTorrents() {
+
+
+
+        String query = "SELECT * FROM myTorrents";
+        JSONObject result = new JSONObject();
+        JSONObject subresult = new JSONObject();
+        try {
+            PreparedStatement preparedStatement = c.prepareStatement(query);
+            ResultSet resultSet  = preparedStatement.executeQuery();
+            int i=1;
+            while(resultSet.next())
+            {
+                int torrentID = resultSet.getInt("torrentID");
+                String name = resultSet.getString("name");
+                String filePath = resultSet.getString("filepath");
+                int size = resultSet.getInt("size");
+                try {
+                    subresult.put("result"+String.valueOf(i)+"ID",torrentID);
+                    subresult.put("result"+String.valueOf(i)+"name",name);
+                    subresult.put("result"+String.valueOf(i)+"filePath",filePath);
+                    subresult.put("result"+String.valueOf(i)+"size",size);
+                    //result.put("result"+String.valueOf(i),subresult);
+
+                    i++;
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                subresult.put("count",i);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            preparedStatement.close();
+            System.out.println("Statment Closed  Get My Torrents");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        System.out.println("My TORRENTS" +subresult.toString());
+        return subresult.toString();
+
+
     }
 }
